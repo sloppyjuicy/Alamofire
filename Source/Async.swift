@@ -33,8 +33,7 @@ public struct AsyncDataResponse<Value> {
 
     public var value: Value {
         get async throws {
-            let response = await response
-            switch response.result {
+            switch await response.result {
             case let .success(value):
                 return value
             case let .failure(error):
@@ -45,7 +44,7 @@ public struct AsyncDataResponse<Value> {
 
     public let handle: Task.Handle<AFDataResponse<Value>, Never>
 
-    private init(request: DataRequest, handle: Task.Handle<AFDataResponse<Value>, Never>) {
+    fileprivate init(request: DataRequest, handle: Task.Handle<AFDataResponse<Value>, Never>) {
         self.request = request
         self.handle = handle
     }
