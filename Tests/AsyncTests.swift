@@ -22,7 +22,7 @@
 //  THE SOFTWARE.
 //
 
-#if canImport(_Concurrency)
+#if swift(>=5.5)
 
 import Alamofire
 import XCTest
