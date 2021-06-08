@@ -22,7 +22,9 @@
 //  THE SOFTWARE.
 //
 
-import Foundation
+#if canImport(_Concurrency)
+
+import Dispatch
 
 @available(macOS 12, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
 public struct AsyncDataResponse<Value> {
@@ -68,3 +70,5 @@ extension DataRequest {
         return AsyncDataResponse<Value>(request: self, handle: handle)
     }
 }
+
+#endif
