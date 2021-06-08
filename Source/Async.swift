@@ -30,20 +30,22 @@ public struct AsyncDataResponse<Value> {
     public var response: DataResponse<Value, AFError> {
         get async { await handle.get() }
     }
+
     public var value: Value {
-         get async throws {
-             let response = await response
-             switch response.result {
-             case let .success(value):
-                 return value
-             case let .failure(error):
-                 throw error
-             }
-         }
+        get async throws {
+            let response = await response
+            switch response.result {
+            case let .success(value):
+                return value
+            case let .failure(error):
+                throw error
+            }
+        }
     }
+
     public let handle: Task.Handle<AFDataResponse<Value>, Never>
-    
-    fileprivate init(request: DataRequest, handle: Task.Handle<AFDataResponse<Value>, Never>) {
+
+    private init(request: DataRequest, handle: Task.Handle<AFDataResponse<Value>, Never>) {
         self.request = request
         self.handle = handle
     }
@@ -56,7 +58,7 @@ extension DispatchQueue {
 @available(macOS 12, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
 extension DataRequest {
     public func asyncResponse<Value: Decodable>(decoding: Value.Type = Value.self) -> AsyncDataResponse<Value> {
-        let handle = `async` {
+        let handle = async {
             await withCheckedContinuation { continuation in
                 self.responseDecodable(of: Value.self, queue: .asyncCompletionQueue) {
                     continuation.resume(returning: $0)

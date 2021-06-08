@@ -32,7 +32,7 @@ final class AsyncTests: BaseTestCase {
     func testAsyncHandle() async {
         // Given, When
         let response = await AF.request(.get).asyncResponse(decoding: TestResponse.self).handle.get()
-        
+
         // Then
         XCTAssertNotNil(response.value)
     }
@@ -40,7 +40,7 @@ final class AsyncTests: BaseTestCase {
     func testAsyncResponse() async {
         // Given, When
         let response = await AF.request(.get).asyncResponse(decoding: TestResponse.self).response
-        
+
         // Then
         XCTAssertNotNil(response.value)
     }
@@ -48,7 +48,7 @@ final class AsyncTests: BaseTestCase {
     func testAsyncResponseValue() async throws {
         // Given, When
         let value = try await AF.request(.get).asyncResponse(decoding: TestResponse.self).value
-        
+
         // Then
         XCTAssertEqual(value.url, "http://127.0.0.1:8080/get")
     }
