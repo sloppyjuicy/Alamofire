@@ -24,7 +24,7 @@
 
 #if swift(>=5.5)
 
-import Dispatch
+import Foundation
 
 @available(macOS 12, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
 public struct AsyncDataResponse<Value> {
@@ -35,12 +35,7 @@ public struct AsyncDataResponse<Value> {
 
     public var value: Value {
         get async throws {
-            switch await response.result {
-            case let .success(value):
-                return value
-            case let .failure(error):
-                throw error
-            }
+            try await response.result.get()
         }
     }
 
@@ -53,15 +48,25 @@ public struct AsyncDataResponse<Value> {
 }
 
 extension DispatchQueue {
-    fileprivate static let asyncCompletionQueue = DispatchQueue(label: "org.alamofire.asyncCompletionQueue")
+    fileprivate static let asyncCompletionQueue = DispatchQueue(label: "org.alamofire.asyncCompletionQueue",
+                                                                attributes: .concurrent)
 }
 
 @available(macOS 12, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
 extension DataRequest {
-    public func asyncResponse<Value: Decodable>(decoding: Value.Type = Value.self) -> AsyncDataResponse<Value> {
-        let handle = async {
+    public func decode<Value: Decodable>(_ type: Value.Type = Value.self,
+                                         dataPreprocessor: DataPreprocessor = DecodableResponseSerializer<Value>.defaultDataPreprocessor,
+                                         decoder: DataDecoder = JSONDecoder(),
+                                         emptyResponseCodes: Set<Int> = DecodableResponseSerializer<Value>.defaultEmptyResponseCodes,
+                                         emptyRequestMethods: Set<HTTPMethod> = DecodableResponseSerializer<Value>.defaultEmptyRequestMethods) -> AsyncDataResponse<Value> {
+        let handle = `async` {
             await withCheckedContinuation { continuation in
-                self.responseDecodable(of: Value.self, queue: .asyncCompletionQueue) {
+                self.responseDecodable(of: Value.self,
+                                       queue: .asyncCompletionQueue,
+                                       dataPreprocessor: dataPreprocessor,
+                                       decoder: decoder,
+                                       emptyResponseCodes: emptyResponseCodes,
+                                       emptyRequestMethods: emptyRequestMethods) {
                     continuation.resume(returning: $0)
                 }
             }
