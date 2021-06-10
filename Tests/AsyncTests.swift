@@ -36,6 +36,16 @@ final class AsyncTests: BaseTestCase {
         // Then
         XCTAssertNotNil(response.value)
     }
+    
+    func testAsyncCancellation() async {
+        // Given, When
+        let response = AF.request(.get).decode(TestResponse.self)
+        response.handle.cancel()
+        let value = await response.handle.get()
+
+        // Then
+        XCTAssertTrue(value.error?.isExplicitlyCancelledError == true)
+    }
 
     func testAsyncResponse() async {
         // Given, When

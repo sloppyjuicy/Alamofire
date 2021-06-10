@@ -32,15 +32,15 @@ public struct AsyncDataResponse<Value> {
     public var response: DataResponse<Value, AFError> {
         get async { await handle.get() }
     }
-
+    
     public var value: Value {
         get async throws {
             try await response.result.get()
         }
     }
-
+    
     public let handle: Task.Handle<AFDataResponse<Value>, Never>
-
+    
     fileprivate init(request: DataRequest, handle: Task.Handle<AFDataResponse<Value>, Never>) {
         self.request = request
         self.handle = handle
@@ -60,20 +60,40 @@ extension DataRequest {
                                          emptyResponseCodes: Set<Int> = DecodableResponseSerializer<Value>.defaultEmptyResponseCodes,
                                          emptyRequestMethods: Set<HTTPMethod> = DecodableResponseSerializer<Value>.defaultEmptyRequestMethods) -> AsyncDataResponse<Value> {
         let handle = `async` {
-            await withCheckedContinuation { continuation in
-                self.responseDecodable(of: Value.self,
-                                       queue: .asyncCompletionQueue,
-                                       dataPreprocessor: dataPreprocessor,
-                                       decoder: decoder,
-                                       emptyResponseCodes: emptyResponseCodes,
-                                       emptyRequestMethods: emptyRequestMethods) {
-                    continuation.resume(returning: $0)
+            await withTaskCancellationHandler {
+                self.cancel()
+            } operation: {
+                await withCheckedContinuation { continuation in
+                    self.responseDecodable(of: Value.self,
+                                           queue: .asyncCompletionQueue,
+                                           dataPreprocessor: dataPreprocessor,
+                                           decoder: decoder,
+                                           emptyResponseCodes: emptyResponseCodes,
+                                           emptyRequestMethods: emptyRequestMethods) {
+                        continuation.resume(returning: $0)
+                    }
                 }
             }
         }
-
+        
         return AsyncDataResponse<Value>(request: self, handle: handle)
     }
 }
+
+//@available(macOS 12, iOS 15.0, tvOS 15.0, watchOS 8.0, *)
+//extension DataStreamRequest {
+//    public struct Sequence<Element>: AsyncSequence {
+//        public struct Iterator: AsyncIteratorProtocol {
+//            mutating public func next() async -> Element? {
+//                nil
+//            }
+//        }
+//
+//        public func makeAsyncIterator() -> Iterator {
+//            Iterator()
+//        }
+//    }
+//    //    public func decode<Value: Decodable>(_ type: Value.Type = Value.self)
+//}
 
 #endif
