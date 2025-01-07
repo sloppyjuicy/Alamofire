@@ -27,10 +27,11 @@ import Foundation
 import XCTest
 
 final class DownloadInitializationTests: BaseTestCase {
+    @MainActor
     func testDownloadClassMethodWithMethodURLAndDestination() {
         // Given
         let endpoint = Endpoint.get
-        let expectation = self.expectation(description: "download should complete")
+        let expectation = expectation(description: "download should complete")
 
         // When
         let request = AF.download(endpoint).response { _ in
@@ -46,11 +47,12 @@ final class DownloadInitializationTests: BaseTestCase {
         XCTAssertNotNil(request.response)
     }
 
+    @MainActor
     func testDownloadClassMethodWithMethodURLHeadersAndDestination() {
         // Given
         let endpoint = Endpoint.get
         let headers: HTTPHeaders = ["Authorization": "123456"]
-        let expectation = self.expectation(description: "download should complete")
+        let expectation = expectation(description: "download should complete")
 
         // When
         let request = AF.download(endpoint, headers: headers).response { _ in
@@ -75,6 +77,7 @@ final class DownloadResponseTests: BaseTestCase {
         testDirectoryURL.appendingPathComponent("\(UUID().uuidString).json")
     }
 
+    @MainActor
     func testDownloadRequest() {
         // Given
         let fileURL = randomCachesFileURL
@@ -82,7 +85,7 @@ final class DownloadResponseTests: BaseTestCase {
         let endpoint = Endpoint.stream(numberOfLines)
         let destination: DownloadRequest.Destination = { _, _ in (fileURL, []) }
 
-        let expectation = self.expectation(description: "Download request should download data to file: \(endpoint.url.absoluteString)")
+        let expectation = expectation(description: "Download request should download data to file: \(endpoint.url.absoluteString)")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -112,9 +115,10 @@ final class DownloadResponseTests: BaseTestCase {
         }
     }
 
+    @MainActor
     func testDownloadRequestResponseURLProducesURL() throws {
         // Given
-        let expectation = self.expectation(description: "Download request should download data")
+        let expectation = expectation(description: "Download request should download data")
         var response: DownloadResponse<URL, AFError>?
 
         // When
@@ -137,13 +141,14 @@ final class DownloadResponseTests: BaseTestCase {
         XCTAssertTrue(FileManager.default.fileExists(atPath: url.path))
     }
 
+    @MainActor
     func testCancelledDownloadRequest() {
         // Given
         let fileURL = randomCachesFileURL
         let numberOfLines = 10
         let destination: DownloadRequest.Destination = { _, _ in (fileURL, []) }
 
-        let expectation = self.expectation(description: "Cancelled download request should not download data to file")
+        let expectation = expectation(description: "Cancelled download request should not download data to file")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -163,12 +168,13 @@ final class DownloadResponseTests: BaseTestCase {
         XCTAssertEqual(response?.error?.isExplicitlyCancelledError, true)
     }
 
+    @MainActor
     func testDownloadRequestWithProgress() {
         // Given
-        let randomBytes = 1 * 25 * 1024
+        let randomBytes = 256
         let endpoint = Endpoint.bytes(randomBytes)
 
-        let expectation = self.expectation(description: "Bytes download progress should be reported: \(endpoint.url)")
+        let expectation = expectation(description: "Bytes download progress should be reported: \(endpoint.url)")
 
         var progressValues: [Double] = []
         var response: DownloadResponse<URL?, AFError>?
@@ -206,13 +212,14 @@ final class DownloadResponseTests: BaseTestCase {
         }
     }
 
+    @MainActor
     func testDownloadRequestWithParameters() {
         // Given
         let fileURL = randomCachesFileURL
         let parameters = ["foo": "bar"]
         let destination: DownloadRequest.Destination = { _, _ in (fileURL, []) }
 
-        let expectation = self.expectation(description: "Download request should download data to file")
+        let expectation = expectation(description: "Download request should download data to file")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -242,6 +249,7 @@ final class DownloadResponseTests: BaseTestCase {
         }
     }
 
+    @MainActor
     func testDownloadRequestWithHeaders() {
         // Given
         let fileURL = randomCachesFileURL
@@ -249,7 +257,7 @@ final class DownloadResponseTests: BaseTestCase {
         let headers: HTTPHeaders = ["Authorization": "123456"]
         let destination: DownloadRequest.Destination = { _, _ in (fileURL, []) }
 
-        let expectation = self.expectation(description: "Download request should download data to file: \(endpoint.url)")
+        let expectation = expectation(description: "Download request should download data to file: \(endpoint.url)")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -268,22 +276,21 @@ final class DownloadResponseTests: BaseTestCase {
         XCTAssertNil(response?.resumeData)
         XCTAssertNil(response?.error)
 
-        if
-            let data = try? Data(contentsOf: fileURL),
-            let jsonObject = try? JSONSerialization.jsonObject(with: data, options: []),
-            let json = jsonObject as? [String: Any],
-            let headers = json["headers"] as? [String: String] {
-            XCTAssertEqual(headers["Authorization"], "123456")
-        } else {
+        guard let data = try? Data(contentsOf: fileURL),
+              let response = try? JSONDecoder().decode(TestResponse.self, from: data) else {
             XCTFail("headers parameter in JSON should not be nil")
+            return
         }
+
+        XCTAssertEqual(response.headers["Authorization"], "123456")
     }
 
+    @MainActor
     func testThatDownloadingFileAndMovingToDirectoryThatDoesNotExistThrowsError() {
         // Given
         let fileURL = testDirectoryURL.appendingPathComponent("some/random/folder/test_output.json")
 
-        let expectation = self.expectation(description: "Download request should download data but fail to move file")
+        let expectation = expectation(description: "Download request should download data but fail to move file")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -304,11 +311,12 @@ final class DownloadResponseTests: BaseTestCase {
         XCTAssertEqual((response?.error?.underlyingError as? CocoaError)?.code, .fileNoSuchFile)
     }
 
+    @MainActor
     func testThatDownloadOptionsCanCreateIntermediateDirectoriesPriorToMovingFile() {
         // Given
         let fileURL = testDirectoryURL.appendingPathComponent("some/random/folder/test_output.json")
 
-        let expectation = self.expectation(description: "Download request should download data to file: \(fileURL)")
+        let expectation = expectation(description: "Download request should download data to file: \(fileURL)")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -328,6 +336,7 @@ final class DownloadResponseTests: BaseTestCase {
         XCTAssertNil(response?.error)
     }
 
+    @MainActor
     func testThatDownloadingFileAndMovingToDestinationThatIsOccupiedThrowsError() throws {
         // Given
         let directoryURL = testDirectoryURL.appendingPathComponent("some/random/folder")
@@ -336,7 +345,7 @@ final class DownloadResponseTests: BaseTestCase {
         let fileURL = directoryURL.appendingPathComponent("test_output.json")
         try "random_data".write(to: fileURL, atomically: true, encoding: .utf8)
 
-        let expectation = self.expectation(description: "Download should complete but fail to move file")
+        let expectation = expectation(description: "Download should complete but fail to move file")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -359,6 +368,7 @@ final class DownloadResponseTests: BaseTestCase {
         XCTAssertEqual((response?.error?.underlyingError as? CocoaError)?.code, .fileWriteFileExists)
     }
 
+    @MainActor
     func testThatDownloadOptionsCanRemovePreviousFilePriorToMovingFile() {
         // Given
         let directoryURL = testDirectoryURL.appendingPathComponent("some/random/folder")
@@ -366,7 +376,7 @@ final class DownloadResponseTests: BaseTestCase {
 
         let fileURL = directoryURL.appendingPathComponent("test_output.json")
 
-        let expectation = self.expectation(description: "Download should complete and move file to URL: \(fileURL)")
+        let expectation = expectation(description: "Download should complete and move file to URL: \(fileURL)")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -393,6 +403,7 @@ final class DownloadResponseTests: BaseTestCase {
 // MARK: -
 
 final class DownloadRequestEventsTestCase: BaseTestCase {
+    @MainActor
     func testThatDownloadRequestTriggersAllAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -447,6 +458,7 @@ final class DownloadRequestEventsTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .finished)
     }
 
+    @MainActor
     func testThatCancelledDownloadRequestTriggersAllAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -500,9 +512,10 @@ final class DownloadRequestEventsTestCase: BaseTestCase {
 // MARK: -
 
 final class DownloadResumeDataTestCase: BaseTestCase {
+    @MainActor
     func testThatCancelledDownloadRequestDoesNotProduceResumeData() {
         // Given
-        let expectation = self.expectation(description: "Download should be cancelled")
+        let expectation = expectation(description: "Download should be cancelled")
         var cancelled = false
 
         var response: DownloadResponse<URL?, AFError>?
@@ -536,7 +549,7 @@ final class DownloadResumeDataTestCase: BaseTestCase {
 
     func testThatDownloadRequestProducesResumeDataOnError() {
         // Given
-        let expectation = self.expectation(description: "download complete")
+        let expectation = expectation(description: "download complete")
 
         var response: DownloadResponse<URL?, AFError>?
 
@@ -557,16 +570,17 @@ final class DownloadResumeDataTestCase: BaseTestCase {
 
         XCTAssertNotNil(response?.resumeData)
         XCTAssertNotNil(download.resumeData)
-        #if !(os(Linux) || os(Windows))
+        #if !canImport(FoundationNetworking) // If we not using swift-corelibs-foundation.
         XCTAssertNotNil(download.error?.downloadResumeData)
         XCTAssertEqual(download.error?.downloadResumeData, response?.resumeData)
         #endif
         XCTAssertEqual(response?.resumeData, download.resumeData)
     }
 
+    @MainActor
     func testThatCancelledDownloadResponseDataMatchesResumeData() {
         // Given
-        let expectation = self.expectation(description: "Download should be cancelled")
+        let expectation = expectation(description: "Download should be cancelled")
         var cancelled = false
 
         var response: DownloadResponse<URL?, AFError>?
@@ -600,9 +614,10 @@ final class DownloadResumeDataTestCase: BaseTestCase {
         XCTAssertEqual(response?.resumeData, download.resumeData)
     }
 
+    @MainActor
     func testThatCancelledDownloadResumeDataIsAvailableWithDecodableResponseSerializer() {
         // Given
-        let expectation = self.expectation(description: "Download should be cancelled")
+        let expectation = expectation(description: "Download should be cancelled")
         var cancelled = false
 
         var response: DownloadResponse<TestResponse, AFError>?
@@ -637,6 +652,7 @@ final class DownloadResumeDataTestCase: BaseTestCase {
         XCTAssertEqual(response?.resumeData, download.resumeData)
     }
 
+    @MainActor
     func testThatCancelledDownloadCanBeResumedWithResumeData() {
         // Given
         let expectation1 = expectation(description: "Download should be cancelled")
@@ -697,9 +713,10 @@ final class DownloadResumeDataTestCase: BaseTestCase {
         progressValues.forEach { XCTAssertGreaterThanOrEqual($0, 0.1) }
     }
 
+    @MainActor
     func testThatCancelledDownloadProducesMatchingResumeData() {
         // Given
-        let expectation = self.expectation(description: "Download should be cancelled")
+        let expectation = expectation(description: "Download should be cancelled")
         var cancelled = false
         var receivedResumeData: Data?
         var response: DownloadResponse<URL?, AFError>?
@@ -739,16 +756,17 @@ final class DownloadResumeDataTestCase: BaseTestCase {
 // MARK: -
 
 final class DownloadResponseMapTestCase: BaseTestCase {
+    @MainActor
     func testThatMapTransformsSuccessValue() {
         // Given
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
         var response: DownloadResponse<String, AFError>?
 
         // When
         AF.download(.get, parameters: ["foo": "bar"]).responseDecodable(of: TestResponse.self) { resp in
             response = resp.map { response in
-                response.args?["foo"] ?? "invalid"
+                response.args["foo"] ?? "invalid"
             }
 
             expectation.fulfill()
@@ -766,10 +784,11 @@ final class DownloadResponseMapTestCase: BaseTestCase {
         XCTAssertNotNil(response?.metrics)
     }
 
+    @MainActor
     func testThatMapPreservesFailureError() {
         // Given
-        let urlString = String.nonexistentDomain
-        let expectation = self.expectation(description: "request should fail with 404")
+        let urlString = String.invalidURL
+        let expectation = expectation(description: "request should fail with invalid URL")
 
         var response: DownloadResponse<String, AFError>?
 
@@ -795,16 +814,17 @@ final class DownloadResponseMapTestCase: BaseTestCase {
 // MARK: -
 
 final class DownloadResponseTryMapTestCase: BaseTestCase {
+    @MainActor
     func testThatTryMapTransformsSuccessValue() {
         // Given
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
-        var response: DownloadResponse<String, Error>?
+        var response: DownloadResponse<String, any Error>?
 
         // When
         AF.download(.get, parameters: ["foo": "bar"]).responseDecodable(of: TestResponse.self) { resp in
             response = resp.tryMap { response in
-                response.args?["foo"] ?? "invalid"
+                response.args["foo"] ?? "invalid"
             }
 
             expectation.fulfill()
@@ -822,13 +842,14 @@ final class DownloadResponseTryMapTestCase: BaseTestCase {
         XCTAssertNotNil(response?.metrics)
     }
 
+    @MainActor
     func testThatTryMapCatchesTransformationError() {
         // Given
         struct TransformError: Error {}
 
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
-        var response: DownloadResponse<String, Error>?
+        var response: DownloadResponse<String, any Error>?
 
         // When
         AF.download(.get, parameters: ["foo": "bar"]).responseDecodable(of: TestResponse.self) { resp in
@@ -855,12 +876,13 @@ final class DownloadResponseTryMapTestCase: BaseTestCase {
         XCTAssertNotNil(response?.metrics)
     }
 
+    @MainActor
     func testThatTryMapPreservesFailureError() {
         // Given
-        let urlString = String.nonexistentDomain
-        let expectation = self.expectation(description: "request should fail with 404")
+        let urlString = String.invalidURL
+        let expectation = expectation(description: "request should fail with 404")
 
-        var response: DownloadResponse<String, Error>?
+        var response: DownloadResponse<String, any Error>?
 
         // When
         AF.download(urlString, parameters: ["foo": "bar"]).responseDecodable(of: TestResponse.self) { resp in
@@ -882,10 +904,11 @@ final class DownloadResponseTryMapTestCase: BaseTestCase {
 }
 
 final class DownloadResponseMapErrorTestCase: BaseTestCase {
+    @MainActor
     func testThatMapErrorTransformsFailureValue() {
         // Given
-        let urlString = String.nonexistentDomain
-        let expectation = self.expectation(description: "request should not succeed")
+        let urlString = String.invalidURL
+        let expectation = expectation(description: "request should not succeed")
 
         var response: DownloadResponse<TestResponse, TestError>?
 
@@ -913,9 +936,10 @@ final class DownloadResponseMapErrorTestCase: BaseTestCase {
         XCTAssertNotNil(response?.metrics)
     }
 
+    @MainActor
     func testThatMapErrorPreservesSuccessValue() {
         // Given
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
         var response: DownloadResponse<Data, TestError>?
 
@@ -940,11 +964,12 @@ final class DownloadResponseMapErrorTestCase: BaseTestCase {
 // MARK: -
 
 final class DownloadResponseTryMapErrorTestCase: BaseTestCase {
+    @MainActor
     func testThatTryMapErrorPreservesSuccessValue() {
         // Given
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
-        var response: DownloadResponse<Data, Error>?
+        var response: DownloadResponse<Data, any Error>?
 
         // When
         AF.download(.get).responseData { resp in
@@ -964,12 +989,13 @@ final class DownloadResponseTryMapErrorTestCase: BaseTestCase {
         XCTAssertNotNil(response?.metrics)
     }
 
+    @MainActor
     func testThatTryMapErrorCatchesTransformationError() {
         // Given
-        let urlString = String.nonexistentDomain
-        let expectation = self.expectation(description: "request should fail")
+        let urlString = String.invalidURL
+        let expectation = expectation(description: "request should fail")
 
-        var response: DownloadResponse<Data, Error>?
+        var response: DownloadResponse<Data, any Error>?
 
         // When
         AF.download(urlString).responseData { resp in
@@ -996,12 +1022,13 @@ final class DownloadResponseTryMapErrorTestCase: BaseTestCase {
         XCTAssertNotNil(response?.metrics)
     }
 
+    @MainActor
     func testThatTryMapErrorTransformsError() {
         // Given
-        let urlString = String.nonexistentDomain
-        let expectation = self.expectation(description: "request should fail")
+        let urlString = String.invalidURL
+        let expectation = expectation(description: "request should fail")
 
-        var response: DownloadResponse<Data, Error>?
+        var response: DownloadResponse<Data, any Error>?
 
         // When
         AF.download(urlString).responseData { resp in

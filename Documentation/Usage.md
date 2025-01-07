@@ -25,7 +25,6 @@
     - [Response Handler](#response-handler)
     - [Response Data Handler](#response-data-handler)
     - [Response String Handler](#response-string-handler)
-    - [Response JSON Handler](#response-json-handler)
     - [Response `Decodable` Handler](#response-decodable-handler)
     - [Chained Response Handlers](#chained-response-handlers)
     - [Response Handler Queue](#response-handler-queue)
@@ -73,6 +72,8 @@ AF.request("https://httpbin.org/get").response { response in
 
 > All examples require `import Alamofire` somewhere in the source file.
 
+> For examples of use with Swift's `async`-`await` syntax, see our [Advanced Usage](https://github.com/Alamofire/Alamofire/blob/master/Documentation/AdvancedUsage.md#using-alamofire-with-swift-concurrency) documentation.
+
 This is actually one form of the two top-level APIs on Alamofire's `Session` type for making requests. Its full definition looks like this:
 
 ```swift
@@ -110,6 +111,7 @@ public struct HTTPMethod: RawRepresentable, Equatable, Hashable {
     public static let patch = HTTPMethod(rawValue: "PATCH")
     public static let post = HTTPMethod(rawValue: "POST")
     public static let put = HTTPMethod(rawValue: "PUT")
+    public static let query = HTTPMethod(rawValue: "QUERY")
     public static let trace = HTTPMethod(rawValue: "TRACE")
 
     public let rawValue: String
@@ -134,10 +136,10 @@ It's important to remember that the different HTTP methods may have different se
 Alamofire also offers an extension on `URLRequest` to bridge the `httpMethod` property that returns a `String` to an `HTTPMethod` value:
 
 ```swift
-public extension URLRequest {
+extension URLRequest {
     /// Returns the `httpMethod` as Alamofire's `HTTPMethod` type.
-    var method: HTTPMethod? {
-        get { return httpMethod.flatMap(HTTPMethod.init) }
+    public var method: HTTPMethod? {
+        get { httpMethod.flatMap(HTTPMethod.init) }
         set { httpMethod = newValue?.rawValue }
     }
 }
@@ -328,6 +330,21 @@ You can create your own `URLEncodedFormParameterEncoder` and specify the desired
 let encoder = URLEncodedFormParameterEncoder(encoder: URLEncodedFormEncoder(keyEncoding: .convertToSnakeCase))
 ```
 
+#### Configuring the Encoding of Object Key Paths
+
+Nest object key paths are typically encoded using brackets (e.g. `parent[child][grandchild]`). Alamofire provides the `KeyPathEncoding` to customize that behavior.
+
+- `.brackets` - Wraps each sub-key in the key path in brackets. e.g `parent[child][grandchild]`.
+- `.dots` - Separates each sub-key in the key path with dots. e.g. `parent.child.grandchild`.
+
+Additionally, you can create your own encoding by creating an instance with a custom encoding closure. For example, `KeyPathEncoding { "-\($0)" }` will separate each sub-key path with hyphens. e.g. `parent-child-grandchild`.
+
+You can create your own `URLEncodedFormParameterEncoder` and specify the desired `KeyPathEncoding` in the initializer of the passed `URLEncodedFormEncoder`:
+
+```swift
+let encoder = URLEncodedFormParameterEncoder(encoder: URLEncodedFormEncoder(keyPathEncoding: .brackets))
+```
+
 ##### Configuring the Encoding of Spaces
 
 Older form encoders used `+` to encode spaces and some servers still expect this encoding instead of the modern percent encoding, so Alamofire includes the following methods for encoding spaces:
@@ -339,6 +356,28 @@ You can create your own `URLEncodedFormParameterEncoder` and specify the desired
 
 ```swift
 let encoder = URLEncodedFormParameterEncoder(encoder: URLEncodedFormEncoder(spaceEncoding: .plusReplaced))
+```
+
+##### Configuring the Encoding of Optionals
+
+There is no standard for encoding `Optional` values as part of form data. Nonetheless, Alamofire provides `NilEncoding` with the following methods for encoding optionals:
+
+- `.dropKey` - Encodes `nil` values by dropping them from the output entirely. This matches other Swift encoders. e.g. `otherValue=2`.
+- `.dropValue` - Encodes `nil` values by dropping the value from the output. e.g. `nilValue=&otherValue=2`.
+- `.null` - Encodes `nil` values as the string `null`. e.g. `nilValue=null&otherValue=2`.
+
+Additionally, custom encodings can be created by specifying an encoding closure that provides the `nil` replacement value.
+
+```swift
+extension URLEncodedFormEncoder.NilEncoding {
+  static let customEncoding = NilEncoding { "customNilValue" }
+}
+```
+
+You can create your own `URLEncodedFormParameterEncoder` and specify the desired `NilEncoding` in the initializer of the passed `URLEncodedFormEncoder`:
+
+```swift
+let encoder = URLEncodedFormParameterEncoder(encoder: URLEncodedFormEncoder(nilEncoding: .dropKey))
 ```
 
 #### `JSONParameterEncoder`
@@ -415,7 +454,7 @@ AF.request("https://httpbin.org/headers", headers: headers).responseDecodable(of
 }
 ```
 
-> For HTTP headers that do not change, it is recommended to set them on the `URLSessionConfiguration` so they are automatically applied to any `URLSessionTask` created by the underlying `URLSession`. For more information, see the [Session Configurations](AdvancedUsage.md#session-manager) section.
+> For HTTP headers that do not change, it is recommended to set them on the `URLSessionConfiguration` so they are automatically applied to any `URLSessionTask` created by the underlying `URLSession`. For more information, see the [Session Configurations](https://github.com/Alamofire/Alamofire/blob/master/Documentation/AdvancedUsage.md#creating-a-session-with-a-urlsessionconfiguration) section.
 
 The default Alamofire `Session` provides a default set of headers for every `Request`. These include:
 

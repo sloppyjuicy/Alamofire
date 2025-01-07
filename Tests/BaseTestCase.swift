@@ -27,7 +27,36 @@ import Foundation
 import XCTest
 
 class BaseTestCase: XCTestCase {
-    let timeout: TimeInterval = 10
+    enum SkipVersion {
+        case twenty
+        case none
+
+        var shouldSkip: Bool {
+            switch self {
+            case .twenty:
+                if #available(macOS 11, iOS 14, tvOS 14, watchOS 7, *) {
+                    false
+                } else {
+                    true
+                }
+            case .none:
+                false
+            }
+        }
+
+        var reason: String {
+            switch self {
+            case .twenty:
+                "Skipped due to being iOS 13 or below."
+            case .none:
+                "This should never skip."
+            }
+        }
+    }
+
+    let timeout: TimeInterval = 3
+
+    var skipVersion: SkipVersion { .none }
 
     var testDirectoryURL: URL {
         FileManager.temporaryDirectoryURL.appendingPathComponent("org.alamofire.tests")
@@ -37,13 +66,27 @@ class BaseTestCase: XCTestCase {
         testDirectoryURL.appendingPathComponent(UUID().uuidString)
     }
 
-    override func setUp() {
-        super.setUp()
+    private var session: Session?
 
-        FileManager.removeAllItemsInsideDirectory(at: testDirectoryURL)
+    override func setUp() {
         FileManager.createDirectory(at: testDirectoryURL)
+
+        super.setUp()
+    }
+
+    override func setUpWithError() throws {
+        try XCTSkipIf(skipVersion.shouldSkip, skipVersion.reason)
+
+        try super.setUpWithError()
+    }
+
+    override func tearDown() {
+        session = nil
+        FileManager.removeAllItemsInsideDirectory(at: testDirectoryURL)
         clearCredentials()
         clearCookies()
+
+        super.tearDown()
     }
 
     func clearCookies(for storage: HTTPCookieStorage = .shared) {
@@ -59,8 +102,13 @@ class BaseTestCase: XCTestCase {
     }
 
     func url(forResource fileName: String, withExtension ext: String) -> URL {
-        let bundle = Bundle(for: BaseTestCase.self)
-        return bundle.url(forResource: fileName, withExtension: ext)!
+        Bundle.test.url(forResource: fileName, withExtension: ext)!
+    }
+
+    func stored(_ session: Session) -> Session {
+        self.session = session
+
+        return session
     }
 
     /// Runs assertions on a particular `DispatchQueue`.
@@ -68,7 +116,8 @@ class BaseTestCase: XCTestCase {
     /// - Parameters:
     ///   - queue: The `DispatchQueue` on which to run the assertions.
     ///   - assertions: Closure containing assertions to run
-    func assert(on queue: DispatchQueue, assertions: @escaping () -> Void) {
+    @MainActor
+    func assert(on queue: DispatchQueue, assertions: @escaping @Sendable () -> Void) {
         let expect = expectation(description: "all assertions are complete")
 
         queue.async {

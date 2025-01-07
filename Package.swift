@@ -1,8 +1,8 @@
-// swift-tools-version:5.5
+// swift-tools-version: 6.0
 //
 //  Package.swift
 //
-//  Copyright (c) 2014-2020 Alamofire Software Foundation (http://alamofire.org/)
+//  Copyright (c) 2024 Alamofire Software Foundation (http://alamofire.org/)
 //
 //  Permission is hereby granted, free of charge, to any person obtaining a copy
 //  of this software and associated documentation files (the "Software"), to deal
@@ -26,15 +26,19 @@
 import PackageDescription
 
 let package = Package(name: "Alamofire",
-                      platforms: [.macOS(.v10_12),
-                                  .iOS(.v10),
-                                  .tvOS(.v10),
-                                  .watchOS(.v3)],
-                      products: [.library(name: "Alamofire",
-                                          targets: ["Alamofire"])],
+                      platforms: [.macOS(.v10_13),
+                                  .iOS(.v12),
+                                  .tvOS(.v12),
+                                  .watchOS(.v4)],
+                      products: [
+                          .library(name: "Alamofire", targets: ["Alamofire"]),
+                          .library(name: "AlamofireDynamic", type: .dynamic, targets: ["Alamofire"])
+                      ],
                       targets: [.target(name: "Alamofire",
                                         path: "Source",
                                         exclude: ["Info.plist"],
+                                        resources: [.process("PrivacyInfo.xcprivacy")],
+                                        swiftSettings: [.enableUpcomingFeature("ExistentialAny")],
                                         linkerSettings: [.linkedFramework("CFNetwork",
                                                                           .when(platforms: [.iOS,
                                                                                             .macOS,
@@ -43,5 +47,6 @@ let package = Package(name: "Alamofire",
                                 .testTarget(name: "AlamofireTests",
                                             dependencies: ["Alamofire"],
                                             path: "Tests",
-                                            exclude: ["Resources", "Info.plist"])],
-                      swiftLanguageVersions: [.v5])
+                                            exclude: ["Info.plist", "Test Plans"],
+                                            resources: [.process("Resources")])],
+                      swiftLanguageModes: [.v5])

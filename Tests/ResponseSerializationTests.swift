@@ -465,7 +465,6 @@ final class DataResponseSerializationTestCase: BaseTestCase {
     }
 }
 
-#if swift(>=5.5)
 final class StaticSerializationTests: BaseTestCase {
     func consumeDownloadResponseSerializer<Serializer: DownloadResponseSerializerProtocol>(_ responseSerializer: Serializer) {
         _ = responseSerializer
@@ -514,7 +513,6 @@ final class StaticSerializationTests: BaseTestCase {
         consumeStreamSerializer(.decodable(of: TestResponse.self))
     }
 }
-#endif
 
 // MARK: -
 
@@ -573,7 +571,7 @@ final class URLResponseSerializerTests: BaseTestCase {
 // MARK: -
 
 // used by testThatDecodableResponseSerializerSucceedsWhenDataIsNilWithEmptyResponseConformingTypeAndEmptyResponseStatusCode
-extension Bool: EmptyResponse {
+extension Swift.Bool: Alamofire.EmptyResponse {
     public static func emptyValue() -> Bool {
         true
     }
@@ -781,7 +779,6 @@ final class DecodableResponseSerializerTests: BaseTestCase {
 
 // MARK: -
 
-#if !SWIFT_PACKAGE
 final class DownloadResponseSerializationTestCase: BaseTestCase {
     // MARK: Properties
 
@@ -1182,18 +1179,18 @@ final class DownloadResponseSerializationTestCase: BaseTestCase {
         XCTAssertEqual(result.success as? NSNull, NSNull())
     }
 }
-#endif
 
 final class CustomResponseSerializerTests: BaseTestCase {
+    @MainActor
     func testThatCustomResponseSerializersCanBeWrittenWithoutCompilerIssues() {
         // Given
         final class UselessResponseSerializer: ResponseSerializer {
-            func serialize(request: URLRequest?, response: HTTPURLResponse?, data: Data?, error: Error?) throws -> Data? {
+            func serialize(request: URLRequest?, response: HTTPURLResponse?, data: Data?, error: (any Error)?) throws -> Data? {
                 data
             }
         }
         let serializer = UselessResponseSerializer()
-        let expectation = self.expectation(description: "request should finish")
+        let expectation = expectation(description: "request should finish")
         var data: Data?
 
         // When
@@ -1385,9 +1382,8 @@ final class DataPreprocessorTests: BaseTestCase {
     }
 }
 
-#if swift(>=5.5)
 final class StaticDataPreprocessorTests: BaseTestCase {
-    func consumeDataPreprocessor(_ dataPreprocessor: DataPreprocessor) {
+    func consumeDataPreprocessor(_ dataPreprocessor: any DataPreprocessor) {
         _ = dataPreprocessor
     }
 
@@ -1401,12 +1397,11 @@ final class StaticDataPreprocessorTests: BaseTestCase {
         consumeDataPreprocessor(.googleXSSI)
     }
 }
-#endif
 
 extension HTTPURLResponse {
     convenience init(statusCode: Int, headers: HTTPHeaders? = nil) {
         let url = Endpoint().url
-        #if os(watchOS) || os(Linux) || os(Windows)
+        #if os(watchOS) || os(Linux) || os(Windows) || os(Android)
         let httpVersion = "HTTP/1.1"
         #else
         let httpVersion = String(kCFHTTPVersion1_1)

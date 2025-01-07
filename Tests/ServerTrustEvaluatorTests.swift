@@ -1,5 +1,5 @@
 //
-//  ServerTrustPolicyTests.swift
+//  ServerTrustEvaluatorTests.swift
 //
 //  Copyright (c) 2014-2018 Alamofire Software Foundation (http://alamofire.org/)
 //
@@ -22,11 +22,13 @@
 //  THE SOFTWARE.
 //
 
+#if canImport(Security)
+
 import Alamofire
 import Foundation
+@preconcurrency import Security
 import XCTest
 
-#if !SWIFT_PACKAGE
 private enum TestCertificates {
     // Root Certificates
     static let rootCA = TestCertificates.certificate(filename: "alamofire-root-ca")
@@ -49,8 +51,7 @@ private enum TestCertificates {
     static let leafValidURI = TestCertificates.certificate(filename: "valid-uri")
 
     static func certificate(filename: String) -> SecCertificate {
-        class Locator {}
-        let filePath = Bundle(for: Locator.self).path(forResource: filename, ofType: "cer")!
+        let filePath = Bundle.test.path(forResource: filename, ofType: "cer")!
         let data = try! Data(contentsOf: URL(fileURLWithPath: filePath))
         let certificate = SecCertificateCreateWithData(nil, data as CFData)!
 
@@ -79,52 +80,50 @@ private enum TestTrusts {
     case leafValidDNSNameWithIncorrectIntermediate
 
     var trust: SecTrust {
-        let trust: SecTrust
-
-        switch self {
+        let trust: SecTrust = switch self {
         case .leafWildcard:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafWildcard,
-                                                      TestCertificates.intermediateCA1,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafWildcard,
+                                              TestCertificates.intermediateCA1,
+                                              TestCertificates.rootCA])
         case .leafMultipleDNSNames:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafMultipleDNSNames,
-                                                      TestCertificates.intermediateCA1,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafMultipleDNSNames,
+                                              TestCertificates.intermediateCA1,
+                                              TestCertificates.rootCA])
         case .leafSignedByCA1:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafSignedByCA1,
-                                                      TestCertificates.intermediateCA1,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafSignedByCA1,
+                                              TestCertificates.intermediateCA1,
+                                              TestCertificates.rootCA])
         case .leafDNSNameAndURI:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafDNSNameAndURI,
-                                                      TestCertificates.intermediateCA1,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafDNSNameAndURI,
+                                              TestCertificates.intermediateCA1,
+                                              TestCertificates.rootCA])
         case .leafExpired:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafExpired,
-                                                      TestCertificates.intermediateCA2,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafExpired,
+                                              TestCertificates.intermediateCA2,
+                                              TestCertificates.rootCA])
         case .leafMissingDNSNameAndURI:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafMissingDNSNameAndURI,
-                                                      TestCertificates.intermediateCA2,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafMissingDNSNameAndURI,
+                                              TestCertificates.intermediateCA2,
+                                              TestCertificates.rootCA])
         case .leafSignedByCA2:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafSignedByCA2,
-                                                      TestCertificates.intermediateCA2,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafSignedByCA2,
+                                              TestCertificates.intermediateCA2,
+                                              TestCertificates.rootCA])
         case .leafValidDNSName:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafValidDNSName,
-                                                      TestCertificates.intermediateCA2,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafValidDNSName,
+                                              TestCertificates.intermediateCA2,
+                                              TestCertificates.rootCA])
         case .leafValidURI:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafValidURI,
-                                                      TestCertificates.intermediateCA2,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafValidURI,
+                                              TestCertificates.intermediateCA2,
+                                              TestCertificates.rootCA])
         case .leafValidDNSNameMissingIntermediate:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafValidDNSName,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafValidDNSName,
+                                              TestCertificates.rootCA])
         case .leafValidDNSNameWithIncorrectIntermediate:
-            trust = TestTrusts.trustWithCertificates([TestCertificates.leafValidDNSName,
-                                                      TestCertificates.intermediateCA1,
-                                                      TestCertificates.rootCA])
+            TestTrusts.trustWithCertificates([TestCertificates.leafValidDNSName,
+                                              TestCertificates.intermediateCA1,
+                                              TestCertificates.rootCA])
         }
 
         return trust
@@ -155,10 +154,10 @@ extension SecTrust {
 
     /// Evaluates `self` and returns `true` if the evaluation succeeds with a value of `.unspecified` or `.proceed`.
     var isValid: Bool {
-        if #available(iOS 12, macOS 10.14, tvOS 12, watchOS 5, *) {
-            return Result { try af.evaluate() }.isSuccess
+        if #available(iOS 12, macOS 10.14, tvOS 12, watchOS 5, visionOS 1, *) {
+            Result { try af.evaluate() }.isSuccess
         } else {
-            return Result { try af.validate { _, _ in TrustError.invalid } }.isSuccess
+            Result { try af.validate { _, _ in TrustError.invalid } }.isSuccess
         }
     }
 }
@@ -1386,7 +1385,7 @@ class ServerTrustPolicyCompositeTestCase: ServerTrustPolicyTestCase {
 
 // MARK: -
 
-class ServerTrustPolicyCertificatesInBundleTestCase: ServerTrustPolicyTestCase {
+final class ServerTrustPolicyCertificatesInBundleTestCase: ServerTrustPolicyTestCase {
     func testOnlyValidCertificatesAreDetected() {
         // Given
         // Files present in bundle in the form of type+encoding+extension [key|cert][DER|PEM].[cer|crt|der|key|pem]
@@ -1398,7 +1397,7 @@ class ServerTrustPolicyCertificatesInBundleTestCase: ServerTrustPolicyTestCase {
         // keyDER.der: DER-encoded key, not a certificate, should fail
 
         // When
-        let certificates = Bundle(for: ServerTrustPolicyCertificatesInBundleTestCase.self).af.certificates
+        let certificates = Bundle.test.af.certificates
 
         // Then
         // Expectation: 19 well-formed certificates in the test bundle plus 4 invalid certificates.
@@ -1416,9 +1415,8 @@ class ServerTrustPolicyCertificatesInBundleTestCase: ServerTrustPolicyTestCase {
     }
 }
 
-#if swift(>=5.5)
 final class StaticServerTrustAccessorTests: ServerTrustPolicyTestCase {
-    func consumeServerTrustEvaluator(_ evaluator: ServerTrustEvaluating) {
+    func consumeServerTrustEvaluator(_ evaluator: any ServerTrustEvaluating) {
         _ = evaluator
     }
 
@@ -1437,6 +1435,5 @@ final class StaticServerTrustAccessorTests: ServerTrustPolicyTestCase {
         consumeServerTrustEvaluator(.publicKeys())
     }
 }
-#endif
 
 #endif

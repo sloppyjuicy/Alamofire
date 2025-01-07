@@ -29,12 +29,13 @@ import XCTest
 final class CachedResponseHandlerTestCase: BaseTestCase {
     // MARK: Tests - Per Request
 
+    @MainActor
     func testThatRequestCachedResponseHandlerCanCacheResponse() {
         // Given
-        let session = self.session()
+        let session = session()
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should cache response")
+        let expectation = expectation(description: "Request should cache response")
 
         // When
         let request = session.request(.default).cacheResponse(using: ResponseCacher.cache).response { resp in
@@ -49,12 +50,13 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
         XCTAssertTrue(session.cachedResponseExists(for: request))
     }
 
+    @MainActor
     func testThatRequestCachedResponseHandlerCanNotCacheResponse() {
         // Given
-        let session = self.session()
+        let session = session()
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should not cache response")
+        let expectation = expectation(description: "Request should not cache response")
 
         // When
         let request = session.request(.default).cacheResponse(using: ResponseCacher.doNotCache).response { resp in
@@ -69,12 +71,13 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
         XCTAssertFalse(session.cachedResponseExists(for: request))
     }
 
+    @MainActor
     func testThatRequestCachedResponseHandlerCanModifyCacheResponse() {
         // Given
-        let session = self.session()
+        let session = session()
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should cache response")
+        let expectation = expectation(description: "Request should cache response")
 
         // When
         let cacher = ResponseCacher(behavior: .modify { _, response in
@@ -99,12 +102,13 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
 
     // MARK: Tests - Per Session
 
+    @MainActor
     func testThatSessionCachedResponseHandlerCanCacheResponse() {
         // Given
-        let session = self.session(using: ResponseCacher.cache)
+        let session = session(using: ResponseCacher.cache)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should cache response")
+        let expectation = expectation(description: "Request should cache response")
 
         // When
         let request = session.request(.default).response { resp in
@@ -119,12 +123,13 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
         XCTAssertTrue(session.cachedResponseExists(for: request))
     }
 
+    @MainActor
     func testThatSessionCachedResponseHandlerCanNotCacheResponse() {
         // Given
-        let session = self.session(using: ResponseCacher.doNotCache)
+        let session = session(using: ResponseCacher.doNotCache)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should not cache response")
+        let expectation = expectation(description: "Request should not cache response")
 
         // When
         let request = session.request(.default).cacheResponse(using: ResponseCacher.doNotCache).response { resp in
@@ -139,6 +144,7 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
         XCTAssertFalse(session.cachedResponseExists(for: request))
     }
 
+    @MainActor
     func testThatSessionCachedResponseHandlerCanModifyCacheResponse() {
         // Given
         let cacher = ResponseCacher(behavior: .modify { _, response in
@@ -148,10 +154,10 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
                               storagePolicy: .allowed)
         })
 
-        let session = self.session(using: cacher)
+        let session = session(using: cacher)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should cache response")
+        let expectation = expectation(description: "Request should cache response")
 
         // When
         let request = session.request(.default).cacheResponse(using: cacher).response { resp in
@@ -169,12 +175,13 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
 
     // MARK: Tests - Per Request Prioritization
 
+    @MainActor
     func testThatRequestCachedResponseHandlerIsPrioritizedOverSessionCachedResponseHandler() {
         // Given
-        let session = self.session(using: ResponseCacher.cache)
+        let session = session(using: ResponseCacher.cache)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should cache response")
+        let expectation = expectation(description: "Request should cache response")
 
         // When
         let request = session.request(.default).cacheResponse(using: ResponseCacher.doNotCache).response { resp in
@@ -191,7 +198,7 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
 
     // MARK: Private - Test Helpers
 
-    private func session(using handler: CachedResponseHandler? = nil) -> Session {
+    private func session(using handler: (any CachedResponseHandler)? = nil) -> Session {
         let configuration = URLSessionConfiguration.af.default
         let capacity = 100_000_000
         let cache: URLCache
@@ -208,9 +215,8 @@ final class CachedResponseHandlerTestCase: BaseTestCase {
     }
 }
 
-#if swift(>=5.5)
 final class StaticCachedResponseHandlerTests: BaseTestCase {
-    func takeCachedResponseHandler(_ handler: CachedResponseHandler) {
+    func takeCachedResponseHandler(_ handler: any CachedResponseHandler) {
         _ = handler
     }
 
@@ -229,7 +235,6 @@ final class StaticCachedResponseHandlerTests: BaseTestCase {
         takeCachedResponseHandler(.modify { _, _ in nil })
     }
 }
-#endif
 
 // MARK: -
 

@@ -27,10 +27,11 @@ import Foundation
 import XCTest
 
 final class RequestResponseTestCase: BaseTestCase {
+    @MainActor
     func testRequestResponse() {
         // Given
         let url = Endpoint.get.url
-        let expectation = self.expectation(description: "GET request should succeed: \(url)")
+        let expectation = expectation(description: "GET request should succeed: \(url)")
         var response: DataResponse<Data?, AFError>?
 
         // When
@@ -49,12 +50,106 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertNil(response?.error)
     }
 
+    @MainActor
+    func testThatDataRequestReceivesInitialResponse() {
+        // Given
+        let url = Endpoint.get.url
+        var initialResponse: HTTPURLResponse?
+        let didReceiveResponse = expectation(description: "didReceiveResponse")
+        let didComplete = expectation(description: "GET request should succeed: \(url)")
+        var response: DataResponse<Data?, AFError>?
+
+        // When
+        AF.request(url, parameters: ["foo": "bar"])
+            .onHTTPResponse { response in
+                initialResponse = response
+                didReceiveResponse.fulfill()
+            }
+            .response { resp in
+                response = resp
+                didComplete.fulfill()
+            }
+
+        wait(for: [didReceiveResponse, didComplete], timeout: timeout, enforceOrder: true)
+
+        // Then
+        XCTAssertEqual(initialResponse, response?.response)
+        XCTAssertNotNil(response?.request)
+        XCTAssertNotNil(response?.response)
+        XCTAssertNotNil(response?.data)
+        XCTAssertNil(response?.error)
+    }
+
+    @MainActor
+    func testThatDataRequestOnHTTPResponseCanAllow() {
+        // Given
+        let url = Endpoint.get.url
+        var initialResponse: HTTPURLResponse?
+        let didReceiveResponse = expectation(description: "didReceiveResponse")
+        let didComplete = expectation(description: "GET request should succeed: \(url)")
+        var response: DataResponse<Data?, AFError>?
+
+        // When
+        AF.request(url, parameters: ["foo": "bar"])
+            .onHTTPResponse { response, completionHandler in
+                initialResponse = response
+                didReceiveResponse.fulfill()
+                completionHandler(.allow)
+            }
+            .response { resp in
+                response = resp
+                didComplete.fulfill()
+            }
+
+        wait(for: [didReceiveResponse, didComplete], timeout: timeout, enforceOrder: true)
+
+        // Then
+        XCTAssertEqual(initialResponse, response?.response)
+        XCTAssertNotNil(response?.request)
+        XCTAssertNotNil(response?.response)
+        XCTAssertNotNil(response?.data)
+        XCTAssertNil(response?.error)
+    }
+
+    @MainActor
+    func testThatDataRequestOnHTTPResponseCanCancel() {
+        // Given
+        let url = Endpoint.get.url
+        var initialResponse: HTTPURLResponse?
+        let didReceiveResponse = expectation(description: "didReceiveResponse")
+        let didComplete = expectation(description: "GET request should succeed: \(url)")
+        var response: DataResponse<Data?, AFError>?
+
+        // When
+        let request = AF.request(url, parameters: ["foo": "bar"])
+            .onHTTPResponse { response, completionHandler in
+                initialResponse = response
+                didReceiveResponse.fulfill()
+                completionHandler(.cancel)
+            }
+            .response { resp in
+                response = resp
+                didComplete.fulfill()
+            }
+
+        wait(for: [didReceiveResponse, didComplete], timeout: timeout, enforceOrder: true)
+
+        // Then
+        XCTAssertEqual(initialResponse, response?.response)
+        XCTAssertNotNil(response?.request)
+        XCTAssertNotNil(response?.response)
+        XCTAssertNil(response?.data)
+        XCTAssertTrue(request.isCancelled, "onHTTPResponse cancelled request should have isCancelled == true")
+        XCTAssertTrue(response?.error?.isExplicitlyCancelledError == true, "onHTTPResponse cancelled request should be explicitly cancelled")
+    }
+
+    @MainActor
     func testRequestResponseWithProgress() {
         // Given
-        let byteCount = 50 * 1024
+        let byteCount = 512
         let url = Endpoint.bytes(byteCount).url
 
-        let expectation = self.expectation(description: "Bytes download progress should be reported: \(url)")
+        let expectation = expectation(description: "Bytes download progress should be reported: \(url)")
 
         var progressValues: [Double] = []
         var response: DataResponse<Data?, AFError>?
@@ -91,6 +186,7 @@ final class RequestResponseTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testPOSTRequestWithUnicodeParameters() {
         // Given
         let parameters = ["french": "français",
@@ -98,7 +194,7 @@ final class RequestResponseTestCase: BaseTestCase {
                           "arabic": "العربية",
                           "emoji": "😃"]
 
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
         var response: DataResponse<TestResponse, AFError>?
 
@@ -126,19 +222,19 @@ final class RequestResponseTestCase: BaseTestCase {
         }
     }
 
-    #if !SWIFT_PACKAGE
+    @MainActor
     func testPOSTRequestWithBase64EncodedImages() {
         // Given
         let pngBase64EncodedString: String = {
-            let URL = url(forResource: "unicorn", withExtension: "png")
-            let data = try! Data(contentsOf: URL)
+            let fileURL = url(forResource: "unicorn", withExtension: "png")
+            let data = try! Data(contentsOf: fileURL)
 
             return data.base64EncodedString(options: .lineLength64Characters)
         }()
 
         let jpegBase64EncodedString: String = {
-            let URL = url(forResource: "rainbow", withExtension: "jpg")
-            let data = try! Data(contentsOf: URL)
+            let fileURL = url(forResource: "rainbow", withExtension: "jpg")
+            let data = try! Data(contentsOf: fileURL)
 
             return data.base64EncodedString(options: .lineLength64Characters)
         }()
@@ -147,7 +243,7 @@ final class RequestResponseTestCase: BaseTestCase {
                           "png_image": pngBase64EncodedString,
                           "jpeg_image": jpegBase64EncodedString]
 
-        let expectation = self.expectation(description: "request should succeed")
+        let expectation = expectation(description: "request should succeed")
 
         var response: DataResponse<TestResponse, AFError>?
 
@@ -174,15 +270,15 @@ final class RequestResponseTestCase: BaseTestCase {
             XCTFail("form parameter in JSON should not be nil")
         }
     }
-    #endif
 
     // MARK: Queues
 
+    @MainActor
     func testThatResponseSerializationWorksWithSerializationQueue() {
         // Given
         let queue = DispatchQueue(label: "org.alamofire.testSerializationQueue")
         let manager = Session(serializationQueue: queue)
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var response: DataResponse<TestResponse, AFError>?
 
         // When
@@ -197,12 +293,13 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(response?.result.isSuccess, true)
     }
 
+    @MainActor
     func testThatRequestsWorksWithRequestAndSerializationQueues() {
         // Given
         let requestQueue = DispatchQueue(label: "org.alamofire.testRequestQueue")
         let serializationQueue = DispatchQueue(label: "org.alamofire.testSerializationQueue")
         let manager = Session(requestQueue: requestQueue, serializationQueue: serializationQueue)
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var response: DataResponse<TestResponse, AFError>?
 
         // When
@@ -217,13 +314,14 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(response?.result.isSuccess, true)
     }
 
+    @MainActor
     func testThatRequestsWorksWithConcurrentRequestAndSerializationQueues() {
         // Given
         let requestQueue = DispatchQueue(label: "org.alamofire.testRequestQueue", attributes: .concurrent)
         let serializationQueue = DispatchQueue(label: "org.alamofire.testSerializationQueue", attributes: .concurrent)
         let session = Session(requestQueue: requestQueue, serializationQueue: serializationQueue)
         let count = 10
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         expectation.expectedFulfillmentCount = count
         var responses: [DataResponse<TestResponse, AFError>] = []
 
@@ -244,6 +342,7 @@ final class RequestResponseTestCase: BaseTestCase {
 
     // MARK: Encodable Parameters
 
+    @MainActor
     func testThatRequestsCanPassEncodableParametersAsJSONBodyData() {
         // Given
         let parameters = TestParameters(property: "one")
@@ -263,6 +362,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(receivedResponse?.result.success?.data, "{\"property\":\"one\"}")
     }
 
+    @MainActor
     func testThatRequestsCanPassEncodableParametersAsAURLQuery() {
         // Given
         let parameters = TestParameters(property: "one")
@@ -282,6 +382,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(receivedResponse?.result.success?.args, ["property": "one"])
     }
 
+    @MainActor
     func testThatRequestsCanPassEncodableParametersAsURLEncodedBodyData() {
         // Given
         let parameters = TestParameters(property: "one")
@@ -303,6 +404,7 @@ final class RequestResponseTestCase: BaseTestCase {
 
     // MARK: Lifetime Events
 
+    @MainActor
     func testThatAutomaticallyResumedRequestReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -329,6 +431,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .finished)
     }
 
+    @MainActor
     func testThatAutomaticallyAndManuallyResumedRequestReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -358,6 +461,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .finished)
     }
 
+    @MainActor
     func testThatManuallyResumedRequestReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -387,6 +491,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .finished)
     }
 
+    @MainActor
     func testThatRequestManuallyResumedManyTimesOnlyReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -416,6 +521,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .finished)
     }
 
+    @MainActor
     func testThatRequestManuallySuspendedManyTimesAfterAutomaticResumeOnlyReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -442,6 +548,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .suspended)
     }
 
+    @MainActor
     func testThatRequestManuallySuspendedManyTimesOnlyReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -470,6 +577,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .suspended)
     }
 
+    @MainActor
     func testThatRequestManuallyCancelledManyTimesAfterAutomaticResumeOnlyReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -499,6 +607,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .cancelled)
     }
 
+    @MainActor
     func testThatRequestManuallyCancelledManyTimesOnlyReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -530,6 +639,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .cancelled)
     }
 
+    @MainActor
     func testThatRequestManuallyCancelledManyTimesOnManyQueuesOnlyReceivesAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -563,6 +673,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .cancelled)
     }
 
+    @MainActor
     func testThatRequestTriggersAllAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -615,6 +726,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .finished)
     }
 
+    @MainActor
     func testThatCancelledRequestTriggersAllAppropriateLifetimeEvents() {
         // Given
         let eventMonitor = ClosureEventMonitor()
@@ -662,6 +774,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(request.state, .cancelled)
     }
 
+    @MainActor
     func testThatAppendingResponseSerializerToCancelledRequestCallsCompletion() {
         // Given
         let session = Session()
@@ -694,6 +807,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertEqual(response2?.error?.isExplicitlyCancelledError, true)
     }
 
+    @MainActor
     func testThatAppendingResponseSerializerToCompletedRequestInsideCompletionResumesRequest() {
         // Given
         let session = Session()
@@ -731,6 +845,7 @@ final class RequestResponseTestCase: BaseTestCase {
         XCTAssertNotNil(response3?.value)
     }
 
+    @MainActor
     func testThatAppendingResponseSerializerToCompletedRequestOutsideCompletionResumesRequest() {
         // Given
         let session = Session()
@@ -763,13 +878,14 @@ final class RequestResponseTestCase: BaseTestCase {
 // MARK: -
 
 final class RequestDescriptionTestCase: BaseTestCase {
+    @MainActor
     func testRequestDescription() {
         // Given
         let url = Endpoint().url
         let manager = Session(startRequestsImmediately: false)
         let request = manager.request(url)
 
-        let expectation = self.expectation(description: "Request description should update: \(url)")
+        let expectation = expectation(description: "Request description should update: \(url)")
 
         var response: HTTPURLResponse?
 
@@ -840,10 +956,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
 
     // MARK: Tests
 
+    @MainActor
     func testGETRequestCURLDescription() {
         // Given
         let url = Endpoint().url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var components: [String]?
 
         // When
@@ -860,10 +977,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?.last, "\"\(url)\"")
     }
 
+    @MainActor
     func testGETRequestCURLDescriptionOnMainQueue() {
         // Given
         let url = Endpoint().url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var isMainThread = false
         var components: [String]?
 
@@ -883,10 +1001,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?.last, "\"\(url)\"")
     }
 
+    @MainActor
     func testGETRequestCURLDescriptionSynchronous() {
         // Given
         let url = Endpoint().url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var components: [String]?
         var syncComponents: [String]?
 
@@ -907,10 +1026,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?.sorted(), syncComponents?.sorted())
     }
 
+    @MainActor
     func testGETRequestCURLDescriptionCanBeRequestedManyTimes() {
         // Given
         let url = Endpoint().url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var components: [String]?
         var secondComponents: [String]?
 
@@ -933,10 +1053,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?.sorted(), secondComponents?.sorted())
     }
 
+    @MainActor
     func testGETRequestWithCustomHeaderCURLDescription() {
         // Given
         let url = Endpoint().url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var cURLDescription: String?
 
         // When
@@ -952,10 +1073,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertNotNil(cURLDescription?.range(of: "-H \"X-Custom-Header: {\\\"key\\\": \\\"value\\\"}\""))
     }
 
+    @MainActor
     func testGETRequestWithDuplicateHeadersDebugDescription() {
         // Given
         let url = Endpoint().url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var cURLDescription: String?
         var components: [String]?
 
@@ -980,10 +1102,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertNotNil(cURLDescription?.range(of: "-H \"Accept-Language: en-GB\""))
     }
 
+    @MainActor
     func testPOSTRequestCURLDescription() {
         // Given
         let url = Endpoint.method(.post).url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var components: [String]?
 
         // When
@@ -1000,10 +1123,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?.last, "\"\(url)\"")
     }
 
+    @MainActor
     func testPOSTRequestWithJSONParametersCURLDescription() {
         // Given
         let url = Endpoint.method(.post).url
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var cURLDescription: String?
         var components: [String]?
 
@@ -1033,6 +1157,7 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?.last, "\"\(url)\"")
     }
 
+    @MainActor
     func testPOSTRequestWithCookieCURLDescription() {
         // Given
         let url = Endpoint.method(.post).url
@@ -1042,7 +1167,7 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
                                              .name: "foo",
                                              .value: "bar"])!
         let cookieManager = sessionWithCookie(cookie)
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var components: [String]?
 
         // When
@@ -1060,6 +1185,7 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertEqual(components?[5..<6], ["-b"])
     }
 
+    @MainActor
     func testPOSTRequestWithCookiesDisabledCURLDescriptionHasNoCookies() {
         // Given
         let url = Endpoint.method(.post).url
@@ -1069,7 +1195,7 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
                                              .name: "foo",
                                              .value: "bar"])!
         sessionDisallowingCookies.session.configuration.httpCookieStorage?.setCookie(cookie)
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var components: [String]?
 
         // When
@@ -1085,11 +1211,12 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertTrue(cookieComponents?.isEmpty == true)
     }
 
+    @MainActor
     func testMultipartFormDataRequestWithDuplicateHeadersCURLDescriptionHasOneContentTypeHeader() {
         // Given
         let url = Endpoint.method(.post).url
         let japaneseData = Data("日本語".utf8)
-        let expectation = self.expectation(description: "multipart form data encoding should succeed")
+        let expectation = expectation(description: "multipart form data encoding should succeed")
         var cURLDescription: String?
         var components: [String]?
 
@@ -1115,10 +1242,11 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
         XCTAssertNotNil(cURLDescription?.range(of: "-H \"Content-Type: multipart/form-data;"))
     }
 
+    @MainActor
     func testThatRequestWithInvalidURLDebugDescription() {
         // Given
         let urlString = "invalid_url"
-        let expectation = self.expectation(description: "request should complete")
+        let expectation = expectation(description: "request should complete")
         var cURLDescription: String?
 
         // When
@@ -1142,6 +1270,7 @@ final class RequestCURLDescriptionTestCase: BaseTestCase {
 }
 
 final class RequestLifetimeTests: BaseTestCase {
+    @MainActor
     func testThatRequestProvidesURLRequestWhenCreated() {
         // Given
         let didReceiveRequest = expectation(description: "did receive task")
@@ -1159,6 +1288,7 @@ final class RequestLifetimeTests: BaseTestCase {
         XCTAssertNotNil(request)
     }
 
+    @MainActor
     func testThatRequestProvidesTaskWhenCreated() {
         // Given
         let didReceiveTask = expectation(description: "did receive task")
@@ -1179,12 +1309,12 @@ final class RequestLifetimeTests: BaseTestCase {
 
 // MARK: -
 
-#if !SWIFT_PACKAGE
 final class RequestInvalidURLTestCase: BaseTestCase {
+    @MainActor
     func testThatDataRequestWithFileURLThrowsError() {
         // Given
         let fileURL = url(forResource: "valid_data", withExtension: "json")
-        let expectation = self.expectation(description: "Request should succeed.")
+        let expectation = expectation(description: "Request should succeed.")
         var response: DataResponse<Data?, AFError>?
 
         // When
@@ -1200,10 +1330,11 @@ final class RequestInvalidURLTestCase: BaseTestCase {
         XCTAssertEqual(response?.result.isSuccess, true)
     }
 
+    @MainActor
     func testThatDownloadRequestWithFileURLThrowsError() {
         // Given
         let fileURL = url(forResource: "valid_data", withExtension: "json")
-        let expectation = self.expectation(description: "Request should succeed.")
+        let expectation = expectation(description: "Request should succeed.")
         var response: DownloadResponse<URL?, AFError>?
 
         // When
@@ -1219,10 +1350,11 @@ final class RequestInvalidURLTestCase: BaseTestCase {
         XCTAssertEqual(response?.result.isSuccess, true)
     }
 
+    @MainActor
     func testThatDataStreamRequestWithFileURLThrowsError() {
         // Given
         let fileURL = url(forResource: "valid_data", withExtension: "json")
-        let expectation = self.expectation(description: "Request should succeed.")
+        let expectation = expectation(description: "Request should succeed.")
         var response: DataStreamRequest.Completion?
 
         // When
@@ -1238,6 +1370,127 @@ final class RequestInvalidURLTestCase: BaseTestCase {
 
         // Then
         XCTAssertNil(response?.response)
+    }
+}
+
+#if canImport(zlib) && !os(Android) // Same condition as `DeflateRequestCompressor`.
+@available(macOS 10.15, iOS 13, tvOS 13, watchOS 6, *)
+final class RequestCompressionTests: BaseTestCase {
+    func testThatRequestsCanBeCompressed() async {
+        // Given
+        let url = Endpoint.method(.post).url
+        let parameters = TestParameters(property: "compressed")
+
+        // When
+        let result = await AF.request(url,
+                                      method: .post,
+                                      parameters: parameters,
+                                      encoder: .json,
+                                      interceptor: .deflateCompressor)
+            .serializingDecodable(TestResponse.self)
+            .result
+
+        // Then
+        XCTAssertTrue(result.isSuccess)
+    }
+
+    func testThatDeflateCompressorThrowsErrorByDefaultWhenRequestAlreadyHasHeader() async {
+        // Given
+        let url = Endpoint.method(.post).url
+        let parameters = TestParameters(property: "compressed")
+
+        // When
+        let result = await AF.request(url,
+                                      method: .post,
+                                      parameters: parameters,
+                                      encoder: .json,
+                                      headers: [.contentEncoding("value")],
+                                      interceptor: .deflateCompressor)
+            .serializingDecodable(TestResponse.self)
+            .result
+
+        // Then
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertNotNil(result.failure?.underlyingError as? DeflateRequestCompressor.DuplicateHeaderError)
+    }
+
+    func testThatDeflateCompressorThrowsErrorWhenConfigured() async {
+        // Given
+        let url = Endpoint.method(.post).url
+        let parameters = TestParameters(property: "compressed")
+
+        // When
+        let result = await AF.request(url,
+                                      method: .post,
+                                      parameters: parameters,
+                                      encoder: .json,
+                                      headers: [.contentEncoding("value")],
+                                      interceptor: .deflateCompressor(duplicateHeaderBehavior: .error))
+            .serializingDecodable(TestResponse.self)
+            .result
+
+        // Then
+        XCTAssertFalse(result.isSuccess)
+        XCTAssertNotNil(result.failure?.underlyingError as? DeflateRequestCompressor.DuplicateHeaderError)
+    }
+
+    func testThatDeflateCompressorReplacesHeaderWhenConfigured() async {
+        // Given
+        let url = Endpoint.method(.post).url
+        let parameters = TestParameters(property: "compressed")
+
+        // When
+        let result = await AF.request(url,
+                                      method: .post,
+                                      parameters: parameters,
+                                      encoder: .json,
+                                      headers: [.contentEncoding("value")],
+                                      interceptor: .deflateCompressor(duplicateHeaderBehavior: .replace))
+            .serializingDecodable(TestResponse.self)
+            .result
+
+        // Then
+        XCTAssertTrue(result.isSuccess)
+    }
+
+    func testThatDeflateCompressorSkipsCompressionWhenConfigured() async {
+        // Given
+        let url = Endpoint.method(.post).url
+        let parameters = TestParameters(property: "compressed")
+
+        // When
+        let result = await AF.request(url,
+                                      method: .post,
+                                      parameters: parameters,
+                                      encoder: .json,
+                                      headers: [.contentEncoding("gzip")],
+                                      interceptor: .deflateCompressor(duplicateHeaderBehavior: .skip))
+            .serializingDecodable(TestResponse.self)
+            .result
+
+        // Then
+        // Request fails as the server expects gzip compression.
+        XCTAssertFalse(result.isSuccess)
+    }
+
+    func testThatDeflateCompressorDoesNotCompressDataWhenClosureReturnsFalse() async {
+        // Given
+        let url = Endpoint.method(.post).url
+        let parameters = TestParameters(property: "compressed")
+
+        // When
+        let result = await AF.request(url,
+                                      method: .post,
+                                      parameters: parameters,
+                                      encoder: .json,
+                                      interceptor: .deflateCompressor { _ in false })
+            .serializingDecodable(TestResponse.self)
+            .result
+
+        // Then
+        XCTAssertTrue(result.isSuccess)
+        // With no compression, request headers reflected from server should have no Content-Encoding.
+        XCTAssertNil(result.success?.headers["Content-Encoding"])
     }
 }
 #endif

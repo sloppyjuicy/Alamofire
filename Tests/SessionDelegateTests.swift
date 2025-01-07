@@ -29,12 +29,13 @@ import XCTest
 final class SessionDelegateTestCase: BaseTestCase {
     // MARK: - Tests - Redirects
 
+    @MainActor
     func testThatRequestWillPerformHTTPRedirectionByDefault() {
         // Given
         let session = Session(configuration: .ephemeral)
         let redirectURLString = Endpoint().url.absoluteString
 
-        let expectation = self.expectation(description: "Request should redirect to \(redirectURLString)")
+        let expectation = expectation(description: "Request should redirect to \(redirectURLString)")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -57,11 +58,12 @@ final class SessionDelegateTestCase: BaseTestCase {
         XCTAssertEqual(response?.response?.statusCode, 200)
     }
 
+    @MainActor
     func testThatRequestWillPerformRedirectionMultipleTimesByDefault() {
         // Given
         let session = Session(configuration: .ephemeral)
 
-        let expectation = self.expectation(description: "Request should redirect")
+        let expectation = expectation(description: "Request should redirect")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -82,12 +84,13 @@ final class SessionDelegateTestCase: BaseTestCase {
         XCTAssertEqual(response?.response?.statusCode, 200)
     }
 
+    @MainActor
     func testThatRequestWillPerformRedirectionFor307Response() {
         // Given
         let session = Session(configuration: .ephemeral)
         let redirectURLString = Endpoint().url.absoluteString
 
-        let expectation = self.expectation(description: "Request should redirect to \(redirectURLString)")
+        let expectation = expectation(description: "Request should redirect to \(redirectURLString)")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -112,13 +115,14 @@ final class SessionDelegateTestCase: BaseTestCase {
 
     // MARK: - Tests - Notification
 
+    @MainActor
     func testThatAppropriateNotificationsAreCalledWithRequestForDataRequest() {
         // Given
         let session = Session(startRequestsImmediately: false)
-        var resumedRequest: Request?
-        var resumedTaskRequest: Request?
-        var completedTaskRequest: Request?
-        var completedRequest: Request?
+        let resumedRequest = Protected<Request?>(nil)
+        let resumedTaskRequest = Protected<Request?>(nil)
+        let completedTaskRequest = Protected<Request?>(nil)
+        let completedRequest = Protected<Request?>(nil)
         var requestResponse: DataResponse<Data?, AFError>?
         let expect = expectation(description: "request should complete")
 
@@ -130,25 +134,25 @@ final class SessionDelegateTestCase: BaseTestCase {
         expectation(forNotification: Request.didResumeNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            resumedRequest = notification.request
+            resumedRequest.write(notification.request)
             return true
         }
         expectation(forNotification: Request.didResumeTaskNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            resumedTaskRequest = notification.request
+            resumedTaskRequest.write(notification.request)
             return true
         }
         expectation(forNotification: Request.didCompleteTaskNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            completedTaskRequest = notification.request
+            completedTaskRequest.write(notification.request)
             return true
         }
         expectation(forNotification: Request.didFinishNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            completedRequest = notification.request
+            completedRequest.write(notification.request)
             return true
         }
 
@@ -166,13 +170,14 @@ final class SessionDelegateTestCase: BaseTestCase {
         XCTAssertEqual(requestResponse?.response?.statusCode, 200)
     }
 
+    @MainActor
     func testThatDidCompleteNotificationIsCalledWithRequestForDownloadRequests() {
         // Given
         let session = Session(startRequestsImmediately: false)
-        var resumedRequest: Request?
-        var resumedTaskRequest: Request?
-        var completedTaskRequest: Request?
-        var completedRequest: Request?
+        let resumedRequest = Protected<Request?>(nil)
+        let resumedTaskRequest = Protected<Request?>(nil)
+        let completedTaskRequest = Protected<Request?>(nil)
+        let completedRequest = Protected<Request?>(nil)
         var requestResponse: DownloadResponse<URL?, AFError>?
         let expect = expectation(description: "request should complete")
 
@@ -184,25 +189,25 @@ final class SessionDelegateTestCase: BaseTestCase {
         expectation(forNotification: Request.didResumeNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            resumedRequest = notification.request
+            resumedRequest.write(notification.request)
             return true
         }
         expectation(forNotification: Request.didResumeTaskNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            resumedTaskRequest = notification.request
+            resumedTaskRequest.write(notification.request)
             return true
         }
         expectation(forNotification: Request.didCompleteTaskNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            completedTaskRequest = notification.request
+            completedTaskRequest.write(notification.request)
             return true
         }
         expectation(forNotification: Request.didFinishNotification, object: nil) { notification in
             guard let receivedRequest = notification.request, receivedRequest == request else { return false }
 
-            completedRequest = notification.request
+            completedRequest.write(notification.request)
             return true
         }
 

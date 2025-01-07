@@ -34,12 +34,13 @@ final class RedirectHandlerTestCase: BaseTestCase {
 
     // MARK: - Tests - Per Request
 
+    @MainActor
     func testThatRequestRedirectHandlerCanFollowRedirects() {
         // Given
         let session = Session()
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should redirect to /get")
+        let expectation = expectation(description: "Request should redirect to /get")
 
         // When
         session.request(endpoint).redirect(using: Redirector.follow).response { resp in
@@ -59,12 +60,13 @@ final class RedirectHandlerTestCase: BaseTestCase {
         XCTAssertEqual(response?.response?.statusCode, 200)
     }
 
+    @MainActor
     func testThatRequestRedirectHandlerCanNotFollowRedirects() {
         // Given
         let session = Session()
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should NOT redirect to /get")
+        let expectation = expectation(description: "Request should NOT redirect to /get")
 
         // When
         session.request(endpoint).redirect(using: Redirector.doNotFollow).response { resp in
@@ -84,13 +86,14 @@ final class RedirectHandlerTestCase: BaseTestCase {
         XCTAssertEqual(response?.response?.statusCode, 302)
     }
 
+    @MainActor
     func testThatRequestRedirectHandlerCanModifyRedirects() {
         // Given
         let session = Session()
         let customRedirectEndpoint = Endpoint.method(.patch)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should redirect to /patch")
+        let expectation = expectation(description: "Request should redirect to /patch")
 
         // When
         let redirector = Redirector(behavior: .modify { _, _, _ in customRedirectEndpoint.urlRequest })
@@ -114,12 +117,13 @@ final class RedirectHandlerTestCase: BaseTestCase {
 
     // MARK: - Tests - Per Session
 
+    @MainActor
     func testThatSessionRedirectHandlerCanFollowRedirects() {
         // Given
         let session = Session(redirectHandler: Redirector.follow)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should redirect to /get")
+        let expectation = expectation(description: "Request should redirect to /get")
 
         // When
         session.request(endpoint).response { resp in
@@ -139,12 +143,13 @@ final class RedirectHandlerTestCase: BaseTestCase {
         XCTAssertEqual(response?.response?.statusCode, 200)
     }
 
+    @MainActor
     func testThatSessionRedirectHandlerCanNotFollowRedirects() {
         // Given
         let session = Session(redirectHandler: Redirector.doNotFollow)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should NOT redirect to /get")
+        let expectation = expectation(description: "Request should NOT redirect to /get")
 
         // When
         session.request(endpoint).response { resp in
@@ -164,6 +169,7 @@ final class RedirectHandlerTestCase: BaseTestCase {
         XCTAssertEqual(response?.response?.statusCode, 302)
     }
 
+    @MainActor
     func testThatSessionRedirectHandlerCanModifyRedirects() {
         // Given
         let customRedirectEndpoint = Endpoint.method(.patch)
@@ -172,7 +178,7 @@ final class RedirectHandlerTestCase: BaseTestCase {
         let session = Session(redirectHandler: redirector)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should redirect to /patch")
+        let expectation = expectation(description: "Request should redirect to /patch")
 
         // When
         session.request(endpoint).response { resp in
@@ -194,12 +200,13 @@ final class RedirectHandlerTestCase: BaseTestCase {
 
     // MARK: - Tests - Per Request Prioritization
 
+    @MainActor
     func testThatRequestRedirectHandlerIsPrioritizedOverSessionRedirectHandler() {
         // Given
         let session = Session(redirectHandler: Redirector.doNotFollow)
 
         var response: DataResponse<Data?, AFError>?
-        let expectation = self.expectation(description: "Request should redirect to /get")
+        let expectation = expectation(description: "Request should redirect to /get")
 
         // When
         session.request(endpoint).redirect(using: Redirector.follow).response { resp in
@@ -220,9 +227,8 @@ final class RedirectHandlerTestCase: BaseTestCase {
     }
 }
 
-#if swift(>=5.5)
 final class StaticRedirectHandlerTests: BaseTestCase {
-    func takeRedirectHandler(_ handler: RedirectHandler) {
+    func takeRedirectHandler(_ handler: any RedirectHandler) {
         _ = handler
     }
 
@@ -241,4 +247,3 @@ final class StaticRedirectHandlerTests: BaseTestCase {
         takeRedirectHandler(.modify { _, _, _ in nil })
     }
 }
-#endif

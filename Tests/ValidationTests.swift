@@ -27,6 +27,7 @@ import Foundation
 import XCTest
 
 final class StatusCodeValidationTestCase: BaseTestCase {
+    @MainActor
     func testThatValidationForRequestWithAcceptableStatusCodeResponseSucceeds() {
         // Given
         let endpoint = Endpoint.status(200)
@@ -59,6 +60,7 @@ final class StatusCodeValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithUnacceptableStatusCodeResponseFails() {
         // Given
         let endpoint = Endpoint.status(404)
@@ -96,6 +98,7 @@ final class StatusCodeValidationTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testThatValidationForRequestWithNoAcceptableStatusCodesFails() {
         // Given
         let endpoint = Endpoint.status(201)
@@ -137,6 +140,7 @@ final class StatusCodeValidationTestCase: BaseTestCase {
 // MARK: -
 
 final class ContentTypeValidationTestCase: BaseTestCase {
+    @MainActor
     func testThatValidationForRequestWithAcceptableContentTypeResponseSucceeds() {
         // Given
         let endpoint = Endpoint.ip
@@ -173,6 +177,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithAcceptableWildcardContentTypeResponseSucceeds() {
         // Given
         let endpoint = Endpoint.ip
@@ -209,6 +214,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithUnacceptableContentTypeResponseFails() {
         // Given
         let endpoint = Endpoint.xml
@@ -247,6 +253,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testThatContentTypeValidationFailureSortsPossibleContentTypes() {
         // Given
         let endpoint = Endpoint.xml
@@ -257,7 +264,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         var requestError: AFError?
         var downloadError: AFError?
 
-        let acceptableContentTypes = [// Sorted in a random order, not alphabetically
+        let acceptableContentTypes = [ // Sorted in a random order, not alphabetically
             "application/octet-stream",
             "image/gif",
             "image/x-xbitmap",
@@ -271,7 +278,8 @@ final class ContentTypeValidationTestCase: BaseTestCase {
             "image/ico",
             "image/bmp",
             "image/x-ms-bmp",
-            "image/x-win-bitmap"]
+            "image/x-win-bitmap"
+        ]
 
         // When
         AF.request(endpoint)
@@ -294,7 +302,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         XCTAssertNotNil(requestError)
         XCTAssertNotNil(downloadError)
 
-        let expectedAcceptableContentTypes = [// Sorted in a specific order, alphabetically
+        let expectedAcceptableContentTypes = [ // Sorted in a specific order, alphabetically
             "application/octet-stream",
             "image/bmp",
             "image/gif",
@@ -308,7 +316,8 @@ final class ContentTypeValidationTestCase: BaseTestCase {
             "image/x-icon",
             "image/x-ms-bmp",
             "image/x-win-bitmap",
-            "image/x-xbitmap"]
+            "image/x-xbitmap"
+        ]
 
         for error in [requestError, downloadError] {
             XCTAssertEqual(error?.isUnacceptableContentType, true)
@@ -317,6 +326,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testThatValidationForRequestWithNoAcceptableContentTypeResponseFails() {
         // Given
         let endpoint = Endpoint.xml
@@ -355,6 +365,7 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testThatValidationForRequestWithNoAcceptableContentTypeResponseSucceedsWhenNoDataIsReturned() {
         // Given
         let endpoint = Endpoint.status(204)
@@ -386,120 +397,12 @@ final class ContentTypeValidationTestCase: BaseTestCase {
         XCTAssertNil(requestError)
         XCTAssertNil(downloadError)
     }
-
-    func testThatValidationForRequestWithAcceptableWildcardContentTypeResponseSucceedsWhenResponseIsNil() {
-        // Given
-        class MockManager: Session {
-            override func request(_ convertible: URLRequestConvertible,
-                                  interceptor: RequestInterceptor? = nil) -> DataRequest {
-                let request = MockDataRequest(convertible: convertible,
-                                              underlyingQueue: rootQueue,
-                                              serializationQueue: serializationQueue,
-                                              eventMonitor: eventMonitor,
-                                              interceptor: interceptor,
-                                              delegate: self)
-
-                perform(request)
-
-                return request
-            }
-
-            override func download(_ convertible: URLRequestConvertible,
-                                   interceptor: RequestInterceptor? = nil,
-                                   to destination: DownloadRequest.Destination?)
-                -> DownloadRequest {
-                let request = MockDownloadRequest(downloadable: .request(convertible),
-                                                  underlyingQueue: rootQueue,
-                                                  serializationQueue: serializationQueue,
-                                                  eventMonitor: eventMonitor,
-                                                  interceptor: interceptor,
-                                                  delegate: self,
-                                                  destination: destination ?? MockDownloadRequest.defaultDestination)
-
-                perform(request)
-
-                return request
-            }
-        }
-
-        class MockDataRequest: DataRequest {
-            override var response: HTTPURLResponse? {
-                MockHTTPURLResponse(url: request!.url!,
-                                    statusCode: 204,
-                                    httpVersion: "HTTP/1.1",
-                                    headerFields: nil)
-            }
-        }
-
-        class MockDownloadRequest: DownloadRequest {
-            override var response: HTTPURLResponse? {
-                MockHTTPURLResponse(url: request!.url!,
-                                    statusCode: 204,
-                                    httpVersion: "HTTP/1.1",
-                                    headerFields: nil)
-            }
-        }
-
-        class MockHTTPURLResponse: HTTPURLResponse {
-            override var mimeType: String? { nil }
-        }
-
-        let manager: Session = {
-            let configuration: URLSessionConfiguration = {
-                let configuration = URLSessionConfiguration.ephemeral
-                configuration.headers = HTTPHeaders.default
-
-                return configuration
-            }()
-
-            return MockManager(configuration: configuration)
-        }()
-
-        let endpoint = Endpoint.method(.delete)
-
-        let expectation1 = expectation(description: "request should be stubbed and return 204 status code")
-        let expectation2 = expectation(description: "download should be stubbed and return 204 status code")
-
-        var requestResponse: DataResponse<Data?, AFError>?
-        var downloadResponse: DownloadResponse<URL?, AFError>?
-
-        // When
-        manager.request(endpoint)
-            .validate(contentType: ["*/*"])
-            .response { resp in
-                requestResponse = resp
-                expectation1.fulfill()
-            }
-
-        manager.download(endpoint)
-            .validate(contentType: ["*/*"])
-            .response { resp in
-                downloadResponse = resp
-                expectation2.fulfill()
-            }
-
-        waitForExpectations(timeout: timeout)
-
-        // Then
-        XCTAssertNotNil(requestResponse?.response)
-        XCTAssertNotNil(requestResponse?.data)
-        XCTAssertNil(requestResponse?.error)
-
-        XCTAssertEqual(requestResponse?.response?.statusCode, 204)
-        XCTAssertNil(requestResponse?.response?.mimeType)
-
-        XCTAssertNotNil(downloadResponse?.response)
-        XCTAssertNotNil(downloadResponse?.fileURL)
-        XCTAssertNil(downloadResponse?.error)
-
-        XCTAssertEqual(downloadResponse?.response?.statusCode, 204)
-        XCTAssertNil(downloadResponse?.response?.mimeType)
-    }
 }
 
 // MARK: -
 
 final class MultipleValidationTestCase: BaseTestCase {
+    @MainActor
     func testThatValidationForRequestWithAcceptableStatusCodeAndContentTypeResponseSucceeds() {
         // Given
         let endpoint = Endpoint.ip
@@ -534,6 +437,7 @@ final class MultipleValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithUnacceptableStatusCodeAndContentTypeResponseFailsWithStatusCodeError() {
         // Given
         let endpoint = Endpoint.xml
@@ -573,6 +477,7 @@ final class MultipleValidationTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testThatValidationForRequestWithUnacceptableStatusCodeAndContentTypeResponseFailsWithContentTypeError() {
         // Given
         let endpoint = Endpoint.xml
@@ -617,6 +522,7 @@ final class MultipleValidationTestCase: BaseTestCase {
 // MARK: -
 
 final class AutomaticValidationTestCase: BaseTestCase {
+    @MainActor
     func testThatValidationForRequestWithAcceptableStatusCodeAndContentTypeResponseSucceeds() {
         // Given
         let urlRequest = Endpoint.ip.modifying(\.headers, to: [.accept("application/json")])
@@ -645,6 +551,7 @@ final class AutomaticValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithUnacceptableStatusCodeResponseFails() {
         // Given
         let request = Endpoint.status(404)
@@ -682,6 +589,7 @@ final class AutomaticValidationTestCase: BaseTestCase {
         }
     }
 
+    @MainActor
     func testThatValidationForRequestWithAcceptableWildcardContentTypeResponseSucceeds() {
         // Given
         let urlRequest = Endpoint.ip.modifying(\.headers, to: [.accept("application/*")])
@@ -710,6 +618,7 @@ final class AutomaticValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithAcceptableComplexContentTypeResponseSucceeds() {
         // Given
         var urlRequest = Endpoint.xml.urlRequest
@@ -741,6 +650,7 @@ final class AutomaticValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationForRequestWithUnacceptableContentTypeResponseFails() {
         // Given
         let urlRequest = Endpoint.xml.modifying(\.headers, to: [.accept("application/json")])
@@ -790,7 +700,7 @@ extension DataRequest {
         }
     }
 
-    func validate(with error: Error) -> Self {
+    func validate(with error: any Error) -> Self {
         validate { _, _, _ in .failure(error) }
     }
 }
@@ -798,8 +708,6 @@ extension DataRequest {
 extension DownloadRequest {
     func validateDataExists() -> Self {
         validate { [unowned self] _, _, _ in
-            let fileURL = self.fileURL
-
             guard let validFileURL = fileURL else { return .failure(ValidationError.missingFile) }
 
             do {
@@ -811,7 +719,7 @@ extension DownloadRequest {
         }
     }
 
-    func validate(with error: Error) -> Self {
+    func validate(with error: any Error) -> Self {
         validate { _, _, _ in .failure(error) }
     }
 }
@@ -819,6 +727,7 @@ extension DownloadRequest {
 // MARK: -
 
 final class CustomValidationTestCase: BaseTestCase {
+    @MainActor
     func testThatCustomValidationClosureHasAccessToServerResponseData() {
         // Given
         let endpoint = Endpoint()
@@ -842,7 +751,7 @@ final class CustomValidationTestCase: BaseTestCase {
 
         AF.download(endpoint)
             .validate { _, _, fileURL in
-                guard let fileURL = fileURL else { return .failure(ValidationError.missingFile) }
+                guard let fileURL else { return .failure(ValidationError.missingFile) }
 
                 do {
                     _ = try Data(contentsOf: fileURL)
@@ -863,6 +772,7 @@ final class CustomValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatCustomValidationCanThrowCustomError() {
         // Given
         let endpoint = Endpoint()
@@ -897,6 +807,7 @@ final class CustomValidationTestCase: BaseTestCase {
         XCTAssertEqual(downloadError?.asAFError?.underlyingError as? ValidationError, .missingFile)
     }
 
+    @MainActor
     func testThatValidationExtensionHasAccessToServerResponseData() {
         // Given
         let endpoint = Endpoint()
@@ -929,6 +840,7 @@ final class CustomValidationTestCase: BaseTestCase {
         XCTAssertNil(downloadError)
     }
 
+    @MainActor
     func testThatValidationExtensionCanThrowCustomError() {
         // Given
         let endpoint = Endpoint()

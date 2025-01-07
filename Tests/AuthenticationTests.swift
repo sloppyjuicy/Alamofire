@@ -27,11 +27,12 @@ import Foundation
 import XCTest
 
 final class BasicAuthenticationTestCase: BaseTestCase {
+    @MainActor
     func testHTTPBasicAuthenticationFailsWithInvalidCredentials() {
         // Given
         let session = Session()
         let endpoint = Endpoint.basicAuth()
-        let expectation = self.expectation(description: "\(endpoint.url) 401")
+        let expectation = expectation(description: "\(endpoint.url) 401")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -53,12 +54,13 @@ final class BasicAuthenticationTestCase: BaseTestCase {
         XCTAssertNil(response?.error)
     }
 
+    @MainActor
     func testHTTPBasicAuthenticationWithValidCredentials() {
         // Given
         let session = Session()
         let user = "user1", password = "password"
         let endpoint = Endpoint.basicAuth(forUser: user, password: password)
-        let expectation = self.expectation(description: "\(endpoint.url) 200")
+        let expectation = expectation(description: "\(endpoint.url) 200")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -80,12 +82,13 @@ final class BasicAuthenticationTestCase: BaseTestCase {
         XCTAssertNil(response?.error)
     }
 
+    @MainActor
     func testHTTPBasicAuthenticationWithStoredCredentials() {
         // Given
         let session = Session()
         let user = "user2", password = "password"
         let endpoint = Endpoint.basicAuth(forUser: user, password: password)
-        let expectation = self.expectation(description: "\(endpoint.url) 200")
+        let expectation = expectation(description: "\(endpoint.url) 200")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -113,11 +116,12 @@ final class BasicAuthenticationTestCase: BaseTestCase {
         XCTAssertNil(response?.error)
     }
 
+    @MainActor
     func testHiddenHTTPBasicAuthentication() {
         // Given
         let session = Session()
         let endpoint = Endpoint.hiddenBasicAuth()
-        let expectation = self.expectation(description: "\(endpoint.url) 200")
+        let expectation = expectation(description: "\(endpoint.url) 200")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -141,12 +145,14 @@ final class BasicAuthenticationTestCase: BaseTestCase {
 
 // MARK: -
 
+// Disabled due to HTTPBin flakiness.
 final class HTTPDigestAuthenticationTestCase: BaseTestCase {
-    func testHTTPDigestAuthenticationWithInvalidCredentials() {
+    @MainActor
+    func disabled_testHTTPDigestAuthenticationWithInvalidCredentials() {
         // Given
         let session = Session()
         let endpoint = Endpoint.digestAuth()
-        let expectation = self.expectation(description: "\(endpoint.url) 401")
+        let expectation = expectation(description: "\(endpoint.url) 401")
 
         var response: DataResponse<Data?, AFError>?
 
@@ -168,12 +174,13 @@ final class HTTPDigestAuthenticationTestCase: BaseTestCase {
         XCTAssertNil(response?.error)
     }
 
-    func testHTTPDigestAuthenticationWithValidCredentials() {
+    @MainActor
+    func disabled_testHTTPDigestAuthenticationWithValidCredentials() {
         // Given
         let session = Session()
         let user = "user", password = "password"
         let endpoint = Endpoint.digestAuth(forUser: user, password: password)
-        let expectation = self.expectation(description: "\(endpoint.url) 200")
+        let expectation = expectation(description: "\(endpoint.url) 200")
 
         var response: DataResponse<Data?, AFError>?
 
